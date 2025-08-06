@@ -93,7 +93,7 @@ const userRegister = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async(req , res)=>{
   const {email , userName , password}=req.body;
 
-  if(!email || !userName){
+  if(!email && !userName){
     throw new ApiError(400 , "Username and email is required");
     
   }
@@ -104,7 +104,7 @@ const loginUser = asyncHandler(async(req , res)=>{
   }
  )
 
- if (user) {
+ if (!user) {
    throw new ApiError(404 , "User not found");
  }
 
@@ -137,8 +137,34 @@ return res
 
 })
 
+const logoutUser = asyncHandler(async (req, res) => {
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined,
+      },
+    },
+    {
+      new: true,
+    }
+  )
+   
+  const options ={
+  httpOnly : true ,
+  secure : true
+}
+
+return res
+.status(200)
+.cookie("accessToken" , options)
+.cookie("refreshToken", options)
+.json(new apiResponse(200 , {} , "User logged out succesfully"))
+
+});
 
 export {
   userRegister,
-  loginUser
+  loginUser,
+  logoutUser
 }
