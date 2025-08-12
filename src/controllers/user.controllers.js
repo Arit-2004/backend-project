@@ -145,8 +145,8 @@ const loginUser = asyncHandler(async (req, res) => {
 const logoutUser = asyncHandler(async(req , res)=>{
   await User.findByIdAndUpdate(
     req.user._id,{
-      $set : {
-        refreshToken : undefined ,
+      $unset : {
+        refreshToken : 1, // better than setting it to null and undefined it removes the field from the database
       }
     },{
       new : true
