@@ -251,28 +251,38 @@ const getCurrentUser = asyncHandler(async(req , res) => {
 const updateUserDetails = asyncHandler(async (req, res) => {
   const { fullname, email } = req.body;
 
+  // 1. Check if both fields are present
   if (!fullname || !email) {
-    throw new ApiError(400, "Both credentials are required");
+    throw new ApiError(400, "Full name and email are required");
   }
 
-  const user = await User.findByIdAndUpdate(
-    req.user?._id,
-    {
-      $set: { fullname, email }
-    },
-    { new: true }
+  // 2. Check if email already exists for another user
+  const existingUser = await User.findOne({ email });
+  if (existingUser && existingUser._id.toString() !== req.user._id.toString()) {
+    throw new ApiError(400, "Email already in use by another account");
+  }
+
+  // 3. Update user
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: { fullname, email } },
+    { new: true, runValidators: true } // runValidators ensures schema rules are applied
   ).select("-password");
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        user,
-        "Account updated successfully"
-      )
-    );
+  if (!updatedUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // 4. Send response
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      updatedUser,
+      "Account updated successfully"
+    )
+  );
 });
+
 
 
 
@@ -347,14 +357,14 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 const getUserChannelProfile = asyncHandler(async (req, res) => {
   const { username } = req.params;
 
-  if (!username.trim()) {
-    throw new ApiError(400, "Username does not exist");
+  if (!username?.trim()) {
+    throw new ApiError(400, "Username is required");
   }
 
   const channel = await User.aggregate([
     {
       $match: {
-        userName: username?.toLowerCase()
+        userName: { $regex: `^${username}$`, $options: "i" } // case-insensitive
       }
     },
     {
@@ -375,12 +385,8 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     },
     {
       $addFields: {
-        subscribersCount: {
-          $size: "$subscriber"
-        },
-        channelsSubscribedToCount: {
-          $size: "$subscribedTo"
-        },
+        subscribersCount: { $size: "$subscriber" },
+        channelsSubscribedToCount: { $size: "$subscribedTo" },
         isSubscribed: {
           $cond: {
             if: { $in: [req.user?._id, "$subscriber.subscriber"] },
@@ -409,13 +415,10 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
   }
 
   return res.status(200).json(
-    new ApiResponse(
-      200,
-      channel[0],
-      "User account fetched successfully"
-    )
+    new ApiResponse(200, channel[0], "User account fetched successfully")
   );
 });
+
 
 
 const getWatchHistory = asyncHandler(async (req, res) => {
