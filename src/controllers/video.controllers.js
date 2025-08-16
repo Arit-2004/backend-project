@@ -1,5 +1,5 @@
 import asyncHandler from "../utils/asyncHandler.js";
-import { Video } from "../models/video.model.js";
+import { Video } from "../models/videos.models.js";
 import { ApiError } from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
@@ -17,6 +17,26 @@ const getAllVideos = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Get video by ID
+ */
+const getVideoById = asyncHandler(async (req, res) => {
+    const { videoId } = req.params;
+
+    if (!isValidObjectId(videoId)) {
+        throw new ApiError(400, "Invalid video id");
+    }
+
+    const video = await Video.findById(videoId)
+        .populate("owner", "userName email");
+
+    if (!video) {
+        throw new ApiError(404, "Video not found");
+    }
+
+    return res.status(200).json(new ApiResponse(200, video, "Video fetched successfully"));
+});
+
+/**
  * Publish a new video
  */
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -26,26 +46,24 @@ const publishAVideo = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Title and description are required");
     }
 
-    // Validate uploads
     if (!req.files?.videoFile || !req.files?.thumbnail) {
         throw new ApiError(400, "Video file and thumbnail are required");
     }
 
-    // Upload to Cloudinary
-    const videoUpload = await uploadOnCloudinary(req.files.videoFile[0].path, "video");
-    const thumbnailUpload = await uploadOnCloudinary(req.files.thumbnail[0].path, "image");
+    const videoUpload = await uploadOnCloudinary(req.files.videoFile[0].path);
+    const thumbnailUpload = await uploadOnCloudinary(req.files.thumbnail[0].path,);
 
-    if (!videoUpload?.secure_url || !thumbnailUpload?.secure_url) {
+    if (!videoUpload?.url || !thumbnailUpload?.url) {
         throw new ApiError(500, "Failed to upload video or thumbnail");
     }
 
     const video = await Video.create({
         title,
         description,
-        videoFile: videoUpload.secure_url, // match schema
-        thumbnail: thumbnailUpload.secure_url,
-        duration: Math.round(videoUpload.duration) || 0, // avoid schema error
-        views: 0, // start at zero
+        videoFile: videoUpload.url,
+        thumbnail: thumbnailUpload.url,
+        views: 0,
+         duration: Math.round(videoUpload.duration) || 0,
         owner: req.user._id
     });
 
@@ -53,7 +71,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
 });
 
 /**
- * Update video details (title/description/thumbnail)
+ * Update video details
  */
 const updateVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params;
@@ -77,9 +95,8 @@ const updateVideo = asyncHandler(async (req, res) => {
     if (title) video.title = title;
     if (description) video.description = description;
 
-    // If thumbnail is updated
     if (req.file) {
-        await deleteFromCloudinary(video.thumbnail); // delete old thumbnail from Cloudinary
+        await deleteFromCloudinary(video.thumbnail, "image");
         const thumbnailUpload = await uploadOnCloudinary(req.file.path, "image");
         if (thumbnailUpload?.secure_url) {
             video.thumbnail = thumbnailUpload.secure_url;
@@ -111,7 +128,6 @@ const deleteVideo = asyncHandler(async (req, res) => {
         throw new ApiError(403, "You are not authorized to delete this video");
     }
 
-    // Delete from Cloudinary
     await deleteFromCloudinary(video.videoFile, "video");
     await deleteFromCloudinary(video.thumbnail, "image");
 
@@ -121,7 +137,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
 });
 
 /**
- * Toggle video publish status
+ * Toggle publish status
  */
 const toggleVideoPublishStatus = asyncHandler(async (req, res) => {
     const { videoId } = req.params;
@@ -156,6 +172,7 @@ const toggleVideoPublishStatus = asyncHandler(async (req, res) => {
 
 export {
     getAllVideos,
+    getVideoById,
     publishAVideo,
     updateVideo,
     deleteVideo,
