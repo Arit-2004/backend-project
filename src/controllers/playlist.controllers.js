@@ -44,36 +44,28 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
     );
 });
 
-const getPlaylistsById = asyncHandler(async (req , res)=> {
-     const {playlistId , userId} = req.params;
+const getPlaylistsById = asyncHandler(async (req, res) => {
+  const { playlistId } = req.params;
 
-     if (!isValidObjectId(playlistId) || !isValidObjectId(userId)) {
-        throw new ApiError(400 , "Invalid playlist ID and User Id")
-     }
+  if (!isValidObjectId(playlistId)) {
+    throw new ApiError(400, "Invalid playlist ID");
+  }
 
-     const playlist = await Playlist.findOne({
-        _id : playlistId,
-        owner : userId
-     })
+  const playlist = await Playlist.findById(playlistId).populate("owner videos");
 
-     if (!playlist){
-        throw new ApiError(404 , "Playlist not found")
-     } 
-        
+  if (!playlist) {
+    throw new ApiError(404, "Playlist not found");
+  }
 
-     return res.status(200)
-     .json(
-        new ApiResponse(
-            200,
-            playlist,
-            "Playlist retrieved successfully by ID"
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      playlist,
+      "Playlist retrieved successfully by ID"
+    )
+  );
+});
 
-        )
-     )
-
-    
-     
-})
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
     const { playlistId, videoId } = req.params;
@@ -111,53 +103,50 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
     );
 });
 
-const removeVideoFromPlaylist = asyncHandler(async(req , res) => {
-    const { playlistId , videoId} = req.params;
+const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
+  const { playlistId, videoId } = req.params;
 
-    //validate IDs
+  // validate IDs
+  if (!isValidObjectId(playlistId) || !isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid playlist ID or video ID");
+  }
 
-    if (!isValidObjectId(playlistId) || !isValidObjectId(videoId)){
-        throw new ApiError(400 , "Invalid playlist ID or video ID");
-    }
+  // check if playlist exists
+  const playlist = await Playlist.findById(playlistId);
+  if (!playlist) {
+    throw new ApiError(404, "Playlist not found");
+  }
 
-    // check if playlist exists
-    const playlist = await Playlist.findById(playlistId);
-    if(!playlist){
-        throw new ApiError(404 , "Playlist not found");
-    }
-    
-    //check ownership
-    if( playlist.owner.toString() !== req.user._id.toString()){
-        throw new ApiError(403 , "You are not authorized to modify this playlist");
-    }
+  // check ownership
+  if (playlist.owner.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "You are not authorized to modify this playlist");
+  }
 
-    //check if video exists in playlist
-    const video = playlist.videos.find(v => v.toString() === videoId);
-    if(!video){
-        throw new ApiError(404 , "Video not found in playlist");
-    }
+  // check if video exists in playlist
+  const video = playlist.videos.find(v => v.toString() === videoId);
+  if (!video) {
+    throw new ApiError(404, "Video not found in playlist");
+  }
 
-    // remove video 
+  // remove video
+  playlist.videos.pull(videoId);
+  await playlist.save();
 
-   await Playlist.videos.pull(videoId);
-    await playlist.save();
-
-    return res.status(200)
-    .json(
-        new ApiResponse(
-            200,
-            playlist,
-            "Video removed from playlist successfully"
-        )
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      playlist,
+      "Video removed from playlist successfully"
     )
-})
+  );
+});
 
 const deletePlaylist = asyncHandler(async(req ,  res)=>{
     const {playlistId} = req.params;
 
     // validate playlist ID
 
-    if (isValidObjectId(playlistId)){
+    if (!isValidObjectId(playlistId)){
         throw new ApiError(400, "Invalid playlist ID");
     }
 
