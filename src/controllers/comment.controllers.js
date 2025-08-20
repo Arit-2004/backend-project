@@ -33,41 +33,39 @@ const addComment = asyncHandler(async(req , res)=>{
     )
 })
 
-const updateComment = asyncHandler(async(req , res) => {
-    const { commentId} = req.params;
-    const { newComment } = req.body;
+const updateComment = asyncHandler(async (req, res) => {
+    const { commentId } = req.params;
+    const { content } = req.body;   // use content, not newComment
 
     if (!isValidObjectId(commentId)) {
         throw new ApiError(400, "Invalid comment Id");
     }
 
-    if(!newComment || newComment.trim() === ""){
-        throw new ApiError(400 , "New comment content is required");
+    if (!content || content.trim() === "") {
+        throw new ApiError(400, "New comment content is required");
     }
 
     const comment = await Comment.findById(commentId);
-    if(!comment){
-        throw new ApiError(404 , "Comment not found");
+    if (!comment) {
+        throw new ApiError(404, "Comment not found");
     }
 
-    if (Comment.owner.toString() !== req.user._id.toString()){
+    if (comment.owner.toString() !== req.user._id.toString()) {
         throw new ApiError(403, "You are not authorized to update this comment");
     }
 
-    comment.content = newComment || comment.content;;
+    comment.content = content;
     await comment.save();
 
-    res
-    .status(200)
-    .json(
+    res.status(200).json(
         new ApiResponse(
-            200, 
+            200,
             comment,
             "Comment updated successfully"
         )
-    )
+    );
+});
 
-})
 
 const deleteComment = asyncHandler(async(req , res)=>{
     const { commentId} = req.params;
