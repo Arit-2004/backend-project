@@ -12,6 +12,11 @@ const router = Router();
 router.use(verifyJWT);
 
 router.route("/toggle/v/:videoId").post(toggleLikeVideos);
-router.route("/toggle/c/commentId").post(toggleLikeComment);
-router.route("/toggle/t/tweetId").post(toggleLikeTweet);
+router.route("/toggle/c/:commentId").post(toggleLikeComment);
+//console.log("Likes Router Loaded ✅");
+
+router.route("/toggle/t/:tweetId").post(toggleLikeTweet);
 router.route("/videos").get(getAllLikeVideos);
+
+
+export default router;
